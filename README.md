@@ -1,121 +1,176 @@
 # Frida MCP
 
-A Model Context Protocol (MCP) implementation for Frida dynamic instrumentation toolkit.
+A Model Context Protocol (MCP) implementation for the Frida dynamic instrumentation
+toolkit. It exposes process/device management, an interactive JavaScript REPL,
+ready-made hooks, and remote frida-server connections as MCP tools so AI systems
+(Claude Desktop, Claude Code, ...) can instrument mobile and desktop apps.
 
-## Overview
+Built on the official [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) (mcp 1.x).
 
-This package provides an MCP-compliant server for Frida, enabling AI systems to interact with mobile and desktop applications through Frida's dynamic instrumentation capabilities. It uses the official [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) to enable seamless integration with AI applications.
+This is a hard fork of [dnakov/frida-mcp](https://github.com/dnakov/frida-mcp),
+reworked for modern frida 17.x and engineered as a maintainable Python package.
 
-## Demo
+## Requirements
 
+- CPython >= 3.12
+- frida >= 17, < 18 (client bindings must match the frida-server version on the device)
+- mcp >= 1.5, < 2
+- [uv](https://docs.astral.sh/uv/) for development
 
-https://github.com/user-attachments/assets/5dc0e8f5-5011-4cf2-be77-6a77ec960501
+> Note: frida 17 removed the Java bridge on Android 14+ in some configurations; this
+> fork targets native instrumentation (Interceptor / Memory / Module APIs).
 
+## What's new in this fork (0.2.0)
 
-
-## Features
-
-- Built with the official MCP Python SDK
-- Comprehensive Frida tools exposed through MCP:
-  - Process management (list, attach, spawn, resume, kill)
-  - Device management (USB, remote devices)
-  - Interactive JavaScript REPL with real-time execution
-  - Script injection with progress tracking
-  - Process and device monitoring
-- Resources for providing Frida data to models
-- Prompts for guided Frida analysis workflows
-- Progress tracking for long-running operations
-- Full support for all MCP transport methods
+- **frida 17 compatible hooks** — the original `create_simple_hook` scripts used
+  `Module.findExportByName()`, which was removed in frida 17. All bundled hook
+  scripts and the example resource now use `Module.getGlobalExportByName()` and
+  report a proper error when an export does not exist on the target platform.
+- **USB-first device policy** — tools without an explicit `device_id` target the
+  USB device first (the common Android workflow) and fall back to the local
+  device, logging a warning (fixes upstream issue #1).
+- **Session & hook lifecycle management** — new tools `list_sessions`,
+  `close_session`, `list_hooks`, `get_hook_messages`, and `remove_hook`.
+  Registries auto-clean when the target detaches, message queues are capped, and
+  sessions survive brief USB disconnects (`persist_timeout`).
+- **Remote frida-server support** — `add_remote_device` / `remove_remote_device`
+  (fixes upstream issue #6, based on upstream PR #7) with IPv6-aware address
+  formatting and optional TLS/auth parameters.
+- **frida 17 spawn API** — `spawn_process` now passes arguments via `argv` as
+  required by frida 17.
+- **Modern package engineering** — split module layout, typed code checked by
+  mypy (strict) and ty, linted/formatted by ruff, unit tests with pytest, uv
+  dependency groups, and a committed `uv.lock`.
+- **Honest error reporting** — operational failures return structured
+  `{"success": false, "error": ...}` results instead of crashing the server.
 
 ## Installation
 
-### Prerequisites
-
-- Python 3.8 or later
-- pip package manager
-- Frida 16.0.0 or later
-
-### Quick Install
+### From PyPI
 
 ```bash
 pip install frida-mcp
 ```
 
-### Development Install
+### From source
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/frida-mcp.git
+git clone <this-repo>
 cd frida-mcp
-
-# Install in development mode with extra tools
-pip install -e ".[dev]"
+uv sync            # creates .venv, installs runtime + dev dependencies
+uv run frida-mcp   # run the server over stdio
 ```
 
 ## Claude Desktop Integration
 
-To use Frida MCP with Claude Desktop, you'll need to update your Claude configuration file:
-
-1. Locate your Claude Desktop configuration file:
-   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-   - Linux: `~/.config/Claude/claude_desktop_config.json`
-
-2. Add the following to your configuration file:
+Add to your Claude Desktop configuration
+(macOS `~/Library/Application Support/Claude/claude_desktop_config.json`, Windows
+`%APPDATA%\Claude\claude_desktop_config.json`, Linux
+`~/.config/Claude/claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "frida": {
-      "command": "frida-mcp"
+      "command": "uv",
+      "args": ["run", "frida-mcp"],
+      "cwd": "/path/to/frida-mcp"
     }
   }
 }
 ```
 
-## Usage
+## Tools
 
-Once installed, you can use Frida MCP directly from Claude Desktop. The server provides the following capabilities:
+### Device management
 
-### Process Management
-- List all running processes
-- Attach to specific processes
-- Spawn new processes
-- Resume suspended processes
-- Kill processes
+| Tool | Description |
+|---|---|
+| `enumerate_devices` | List all devices (USB, local, remote) |
+| `get_device` / `get_usb_device` / `get_local_device` | Get device info by ID / USB / local |
+| `add_remote_device` | Connect to a remote frida-server (host, port, TLS/auth) |
+| `remove_remote_device` | Disconnect a remote frida-server |
 
-### Device Management
-- List all connected devices (USB, remote)
-- Get device information
-- Connect to specific devices
+### Process management
 
-### Interactive JavaScript REPL
-- Create interactive sessions with processes
-- Execute JavaScript code in real-time
-- Monitor process state and memory
-- Hook functions and intercept calls
-- Capture console.log output
-- Handle errors and exceptions gracefully
+| Tool | Description |
+|---|---|
+| `list_processes` / `enumerate_processes` | List processes on the default / a chosen device |
+| `get_process_by_name` | Find a process by case-insensitive name substring |
+| `attach_to_process` | Verify attachability, then detach immediately |
+| `spawn_process` / `resume_process` / `kill_process` | Spawn (suspended), resume, kill |
 
-### Script Injection
-- Inject custom JavaScript scripts
-- Track injection progress
-- Handle script errors and exceptions
+### Interactive sessions
 
-### Resources
-- Get Frida version information
-- Access process list in human-readable format
-- Access device list in human-readable format
+| Tool | Description |
+|---|---|
+| `create_interactive_session` | Attach and get a session ID |
+| `execute_in_session` | Run JavaScript in the target (optionally `keep_alive`) |
+| `get_session_messages` | Drain messages from persistent scripts |
+| `list_sessions` / `close_session` | Inspect / clean up sessions |
+
+### Ready-made hooks
+
+| Tool | Description |
+|---|---|
+| `create_simple_hook` | Install a memory (>1 MB malloc), file (open), or network (connect) hook |
+| `get_hook_messages` | Drain hook output |
+| `list_hooks` / `remove_hook` | Inspect / tear down hooks |
+
+Example:
+
+```
+create_simple_hook(pid=1234, hook_type="network")   # -> hook_id
+get_hook_messages(hook_id="hook_...")               # -> captured logs
+remove_hook(hook_id="hook_...")                     # -> unload + detach
+```
+
+## Resources
+
+- `frida://version` — frida client version
+- `frida://processes` — process list of the default device
+- `frida://devices` — device list
+- `frida://example/hook` — frida 17 compatible example hook script
+
+## Prompts
+
+- `analyze_app_prompt`, `analyze_process_prompt`, `inject_script_prompt` —
+  guided analysis workflows for the model.
 
 ## Development
 
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/frida-mcp.git
-cd frida-mcp
+uv sync                    # install dependencies
+uv run pytest              # unit tests (fakes; no device needed)
+uv run ruff check .        # lint
+uv run ruff format --check .
+uv run mypy                # strict type checking
+uv run ty check src        # runtime type checking
+uv build                   # build sdist + wheel
+```
 
-# Install development dependencies
-pip install -e ".[dev]"
+Live smoke tests against a real device:
+
+```bash
+FRIDA_LIVE_TESTS=1 uv run pytest tests/test_self_attach.py
+```
+
+## Project structure
+
+```
+src/frida_mcp/
+  cli.py            # thin STDIO entry point
+  server.py         # create_server() factory
+  devices.py        # USB-first device policy
+  state.py          # session/hook registries (thread-safe, capped queues)
+  resources.py      # frida:// resources
+  prompts.py        # guided prompts
+  tools/
+    device_tools.py # device + remote connection tools
+    processes.py    # process management tools
+    sessions.py     # interactive session tools
+    hooks.py        # ready-made hooks + lifecycle
+tests/              # pytest suite with faked devices
 ```
 
 ## License

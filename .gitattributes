@@ -1,0 +1,6 @@
+# Normalize line endings: keep LF in the repository on Windows checkouts.
+* text=auto
+*.py text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.lock text eol=lf
