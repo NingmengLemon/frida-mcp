@@ -6,7 +6,7 @@ import ipaddress
 from typing import Annotated, Any
 
 import frida
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from pydantic import Field
 
 from frida_mcp._exceptions import FRIDA_ERRORS
@@ -133,9 +133,12 @@ def remove_remote_device(
 
 
 def register(mcp: FastMCP) -> None:
-    mcp.tool()(enumerate_devices)
-    mcp.tool()(get_device)
-    mcp.tool()(get_usb_device)
-    mcp.tool()(get_local_device)
-    mcp.tool()(add_remote_device)
-    mcp.tool()(remove_remote_device)
+    for fn in (
+        enumerate_devices,
+        get_device,
+        get_usb_device,
+        get_local_device,
+        add_remote_device,
+        remove_remote_device,
+    ):
+        mcp.add_tool(fn)

@@ -5,7 +5,7 @@ toolkit. It exposes process/device management, an interactive JavaScript REPL,
 ready-made hooks, and remote frida-server connections as MCP tools so AI systems
 (Claude Desktop, Claude Code, ...) can instrument mobile and desktop apps.
 
-Built on the official [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) (mcp 1.x).
+Built on the standalone [FastMCP](https://gofastmcp.com) framework (fastmcp 3.x).
 
 This is a hard fork of [dnakov/frida-mcp](https://github.com/dnakov/frida-mcp),
 reworked for modern frida 17.x and engineered as a maintainable Python package.
@@ -14,13 +14,13 @@ reworked for modern frida 17.x and engineered as a maintainable Python package.
 
 - CPython >= 3.12
 - frida >= 17, < 18 (client bindings must match the frida-server version on the device)
-- mcp >= 1.5, < 2
+- fastmcp >= 3, < 4
 - [uv](https://docs.astral.sh/uv/) for development
 
 > Note: frida 17 removed the Java bridge on Android 14+ in some configurations; this
 > fork targets native instrumentation (Interceptor / Memory / Module APIs).
 
-## What's new in this fork (0.2.0)
+## What's new in this fork (0.3.0)
 
 - **frida 17 compatible hooks** — the original `create_simple_hook` scripts used
   `Module.findExportByName()`, which was removed in frida 17. All bundled hook
@@ -43,22 +43,24 @@ reworked for modern frida 17.x and engineered as a maintainable Python package.
   dependency groups, and a committed `uv.lock`.
 - **Honest error reporting** — operational failures return structured
   `{"success": false, "error": ...}` results instead of crashing the server.
+- **FastMCP 3** — migrated from the mcp SDK's bundled FastMCP 1.0 to the
+  standalone fastmcp framework (fastmcp >= 3, < 4). Prompts were removed:
+  tools are the interface; every tool ships a description the model reads.
 
 ## Installation
-
-### From PyPI
-
-```bash
-pip install frida-mcp
-```
-
-### From source
 
 ```bash
 git clone <this-repo>
 cd frida-mcp
 uv sync            # creates .venv, installs runtime + dev dependencies
 uv run frida-mcp   # run the server over stdio
+```
+
+or use uv tool / uvx
+
+```bash
+uv tool install <this-repo>
+frida-mcp
 ```
 
 ## Claude Desktop Integration
@@ -85,7 +87,7 @@ Add to your Claude Desktop configuration
 ### Device management
 
 | Tool | Description |
-|---|---|
+| --- | --- |
 | `enumerate_devices` | List all devices (USB, local, remote) |
 | `get_device` / `get_usb_device` / `get_local_device` | Get device info by ID / USB / local |
 | `add_remote_device` | Connect to a remote frida-server (host, port, TLS/auth) |
@@ -94,7 +96,7 @@ Add to your Claude Desktop configuration
 ### Process management
 
 | Tool | Description |
-|---|---|
+| --- | --- |
 | `list_processes` / `enumerate_processes` | List processes on the default / a chosen device |
 | `get_process_by_name` | Find a process by case-insensitive name substring |
 | `attach_to_process` | Verify attachability, then detach immediately |
@@ -103,7 +105,7 @@ Add to your Claude Desktop configuration
 ### Interactive sessions
 
 | Tool | Description |
-|---|---|
+| --- | --- |
 | `create_interactive_session` | Attach and get a session ID |
 | `execute_in_session` | Run JavaScript in the target (optionally `keep_alive`) |
 | `get_session_messages` | Drain messages from persistent scripts |
@@ -112,17 +114,17 @@ Add to your Claude Desktop configuration
 ### Ready-made hooks
 
 | Tool | Description |
-|---|---|
+| --- | --- |
 | `create_simple_hook` | Install a memory (>1 MB malloc), file (open), or network (connect) hook |
 | `get_hook_messages` | Drain hook output |
 | `list_hooks` / `remove_hook` | Inspect / tear down hooks |
 
 Example:
 
-```
-create_simple_hook(pid=1234, hook_type="network")   # -> hook_id
-get_hook_messages(hook_id="hook_...")               # -> captured logs
-remove_hook(hook_id="hook_...")                     # -> unload + detach
+```py
+create_simple_hook(pid=1234, hook_type="network")  # -> hook_id
+get_hook_messages(hook_id="hook_...")  # -> captured logs
+remove_hook(hook_id="hook_...")  # -> unload + detach
 ```
 
 ## Resources
@@ -131,11 +133,6 @@ remove_hook(hook_id="hook_...")                     # -> unload + detach
 - `frida://processes` — process list of the default device
 - `frida://devices` — device list
 - `frida://example/hook` — frida 17 compatible example hook script
-
-## Prompts
-
-- `analyze_app_prompt`, `analyze_process_prompt`, `inject_script_prompt` —
-  guided analysis workflows for the model.
 
 ## Development
 
@@ -157,14 +154,13 @@ FRIDA_LIVE_TESTS=1 uv run pytest tests/test_self_attach.py
 
 ## Project structure
 
-```
+```txt
 src/frida_mcp/
   cli.py            # thin STDIO entry point
   server.py         # create_server() factory
   devices.py        # USB-first device policy
   state.py          # session/hook registries (thread-safe, capped queues)
   resources.py      # frida:// resources
-  prompts.py        # guided prompts
   tools/
     device_tools.py # device + remote connection tools
     processes.py    # process management tools

@@ -1,6 +1,8 @@
-"""Tests for the server factory: registration of tools/resources/prompts."""
+"""Tests for the server factory: registration of tools and resources."""
 
 from __future__ import annotations
+
+import asyncio
 
 from frida_mcp.resources import _EXAMPLE_HOOK
 from frida_mcp.server import create_server
@@ -33,13 +35,18 @@ EXPECTED_TOOLS = {
 
 def test_tools_registered() -> None:
     mcp = create_server()
-    names = {t.name for t in mcp._tool_manager.list_tools()}
+    tools = asyncio.run(mcp.list_tools())
+    names = {t.name for t in tools}
     assert names >= EXPECTED_TOOLS
+    # every tool carries a description for the model
+    descriptions = {t.name: t.description for t in tools if t.name in EXPECTED_TOOLS}
+    assert all(desc for desc in descriptions.values())
 
 
 def test_resources_registered() -> None:
     mcp = create_server()
-    uris = {str(r.uri) for r in mcp._resource_manager.list_resources()}
+    resources = asyncio.run(mcp.list_resources())
+    uris = {str(r.uri) for r in resources}
     assert uris >= {
         "frida://version",
         "frida://processes",
@@ -48,14 +55,10 @@ def test_resources_registered() -> None:
     }
 
 
-def test_prompts_registered() -> None:
+def test_no_prompts_registered() -> None:
     mcp = create_server()
-    names = {p.name for p in mcp._prompt_manager.list_prompts()}
-    assert names >= {
-        "analyze_app_prompt",
-        "inject_script_prompt",
-        "analyze_process_prompt",
-    }
+    prompts = asyncio.run(mcp.list_prompts())
+    assert prompts == []
 
 
 def test_example_hook_uses_frida17_api() -> None:

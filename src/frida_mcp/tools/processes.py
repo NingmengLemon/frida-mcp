@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from pydantic import Field
 
 from frida_mcp._exceptions import FRIDA_ERRORS
@@ -18,7 +18,10 @@ def _list_processes(device_id: str | None) -> list[dict[str, Any]]:
 
 
 def list_processes() -> list[dict[str, Any]]:
-    """List all processes running on the default device."""
+    """List all processes on the default device (USB first, local fallback).
+
+    Convenience wrapper for enumerate_processes() without a device_id.
+    """
     return _list_processes(None)
 
 
@@ -33,7 +36,10 @@ def get_process_by_name(
     ),
     device_id: DeviceId = None,
 ) -> dict[str, Any]:
-    """Find a process by name (case-insensitive substring match)."""
+    """Find a process by name: case-insensitive substring, first match wins.
+
+    Returns {"found": true, ...} for the first match, or {"found": false, "error": ...}.
+    """
     for proc in resolve_device(device_id).enumerate_processes():
         if name.lower() in proc.name.lower():
             return {"pid": proc.pid, "name": proc.name, "found": True}
@@ -88,10 +94,13 @@ def kill_process(pid: Pid, device_id: DeviceId = None) -> dict[str, Any]:
 
 
 def register(mcp: FastMCP) -> None:
-    mcp.tool()(list_processes)
-    mcp.tool()(enumerate_processes)
-    mcp.tool()(get_process_by_name)
-    mcp.tool()(attach_to_process)
-    mcp.tool()(spawn_process)
-    mcp.tool()(resume_process)
-    mcp.tool()(kill_process)
+    for fn in (
+        list_processes,
+        enumerate_processes,
+        get_process_by_name,
+        attach_to_process,
+        spawn_process,
+        resume_process,
+        kill_process,
+    ):
+        mcp.add_tool(fn)

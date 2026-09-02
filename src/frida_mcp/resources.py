@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import frida
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from frida_mcp.devices import default_device
 

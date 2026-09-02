@@ -11,7 +11,7 @@ import logging
 import threading
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from frida_mcp._exceptions import FRIDA_ERRORS
 from frida_mcp.devices import resolve_device
@@ -123,9 +123,11 @@ def create_simple_hook(
 ) -> dict[str, Any]:
     """Attach to a process and install a ready-made hook (memory/file/network).
 
-    Returns a hook_id on success. Collect its output with get_hook_messages and
-    tear it down with remove_hook. The hook reports an error (success False)
-    when the target export does not exist on that platform.
+    Returns a hook_id on success. Hook output (send() calls) is buffered per
+    hook and retrieved with get_hook_messages; console.log goes to the
+    target's own stdout. Tear the hook down with remove_hook. The hook
+    reports an error (success False) when the target export does not exist
+    on that platform.
     """
     source = _HOOK_SOURCES.get(hook_type)
     if source is None:
@@ -245,7 +247,5 @@ def remove_hook(hook_id: HookId) -> dict[str, Any]:
 
 
 def register(mcp: FastMCP) -> None:
-    mcp.tool()(create_simple_hook)
-    mcp.tool()(list_hooks)
-    mcp.tool()(get_hook_messages)
-    mcp.tool()(remove_hook)
+    for fn in (create_simple_hook, list_hooks, get_hook_messages, remove_hook):
+        mcp.add_tool(fn)

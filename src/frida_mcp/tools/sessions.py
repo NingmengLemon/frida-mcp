@@ -5,7 +5,7 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from pydantic import Field
 
 from frida_mcp._exceptions import FRIDA_ERRORS
@@ -243,8 +243,11 @@ def close_session(session_id: SessionId) -> dict[str, Any]:
 
 
 def register(mcp: FastMCP) -> None:
-    mcp.tool()(create_interactive_session)
-    mcp.tool()(execute_in_session)
-    mcp.tool()(get_session_messages)
-    mcp.tool()(list_sessions)
-    mcp.tool()(close_session)
+    for fn in (
+        create_interactive_session,
+        execute_in_session,
+        get_session_messages,
+        list_sessions,
+        close_session,
+    ):
+        mcp.add_tool(fn)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from frida_mcp.tools import device_tools, hooks, processes, sessions
 
