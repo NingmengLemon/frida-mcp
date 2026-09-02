@@ -5,7 +5,7 @@ toolkit. It exposes process/device management, an interactive JavaScript REPL,
 ready-made hooks, and remote frida-server connections as MCP tools so AI systems
 (Claude Desktop, Claude Code, ...) can instrument mobile and desktop apps.
 
-Built on the standalone [FastMCP](https://gofastmcp.com) framework (fastmcp 3.x).
+Built on the standalone [FastMCP](https://gofastmcp.com) framework (fastmcp 4.x, MCP SDK v2).
 
 This is a hard fork of [dnakov/frida-mcp](https://github.com/dnakov/frida-mcp),
 reworked for modern frida 17.x and engineered as a maintainable Python package.
@@ -14,13 +14,13 @@ reworked for modern frida 17.x and engineered as a maintainable Python package.
 
 - CPython >= 3.12
 - frida >= 17, < 18 (client bindings must match the frida-server version on the device)
-- fastmcp >= 3, < 4
+- fastmcp >= 4, < 5
 - [uv](https://docs.astral.sh/uv/) for development
 
 > Note: frida 17 removed the Java bridge on Android 14+ in some configurations; this
 > fork targets native instrumentation (Interceptor / Memory / Module APIs).
 
-## What's new in this fork (0.3.0)
+## What's new in this fork (0.4.0)
 
 - **frida 17 compatible hooks** — the original `create_simple_hook` scripts used
   `Module.findExportByName()`, which was removed in frida 17. All bundled hook
@@ -44,8 +44,13 @@ reworked for modern frida 17.x and engineered as a maintainable Python package.
 - **Honest error reporting** — operational failures return structured
   `{"success": false, "error": ...}` results instead of crashing the server.
 - **FastMCP 3** — migrated from the mcp SDK's bundled FastMCP 1.0 to the
-  standalone fastmcp framework (fastmcp >= 3, < 4). Prompts were removed:
-  tools are the interface; every tool ships a description the model reads.
+  standalone fastmcp framework. Prompts were removed: tools are the
+  interface; every tool ships a description the model reads.
+- **FastMCP 4 / SDK v2** — a client cancelling an in-flight tool call used to
+  crash the whole server ("Request already responded to", python-sdk issue
+  #1152; no fix ever shipped on the 1.x line). fastmcp 4 runs on the rewritten
+  MCP SDK v2, which handles cancellation gracefully; regression tests pin
+  this behavior for both async and sync tools.
 
 ## Installation
 
