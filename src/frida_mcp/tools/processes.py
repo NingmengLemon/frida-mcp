@@ -65,7 +65,12 @@ def spawn_process(
     args: Args = None,
     device_id: DeviceId = None,
 ) -> dict[str, Any]:
-    """Spawn a program on a device (stays suspended until resume_process)."""
+    """Spawn a program on a device (stays suspended until resume_process).
+
+    Note: spawning an Android package that is already running kills the old
+    instance and starts a fresh one. Spawning waits for the app to launch and
+    times out when the device screen is locked.
+    """
     try:
         pid = resolve_device(device_id).spawn(
             program, argv=cast(list[str | bytes] | None, args)
